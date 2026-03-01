@@ -304,10 +304,14 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword, data: newData })
       });
-      if (!res.ok) throw new Error("Unauthorized");
-    } catch (e) {
-      alert("Erreur lors de la sauvegarde. Vérifiez votre mot de passe.");
-      setIsAdmin(false);
+      if (res.status === 401) {
+        setIsAdmin(false);
+        throw new Error("Session expirée ou mot de passe incorrect.");
+      }
+      if (!res.ok) throw new Error("Erreur de serveur");
+    } catch (e: any) {
+      console.error("Save error:", e);
+      alert(e.message || "Erreur lors de la sauvegarde. Vérifiez votre connexion.");
     } finally {
       setIsSaving(false);
     }
