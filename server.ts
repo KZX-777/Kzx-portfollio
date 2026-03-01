@@ -90,11 +90,19 @@ async function startServer() {
     try {
       if (supabase) {
         // Upsert data in Supabase
-        await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
+        const { error } = await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
+        if (error) {
+          console.error("Supabase Upsert Error:", error);
+          throw new Error(`Supabase Error: ${error.message}`);
+        }
         return res.json({ success: true });
       }
-    } catch (err) {
-      console.error("Supabase save error, falling back to SQLite", err);
+    } catch (err: any) {
+      console.error("Supabase save error:", err);
+      // Don't fallback to SQLite on Vercel as it's read-only/volatile
+      if (process.env.NODE_ENV === "production") {
+        return res.status(500).json({ error: err.message || "Erreur de sauvegarde Cloud" });
+      }
     }
 
     // SQLite Fallback
