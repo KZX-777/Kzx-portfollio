@@ -23,7 +23,8 @@ import {
   Github,
   Gamepad2,
   ExternalLink,
-  Link
+  Link,
+  X
 } from 'lucide-react';
 
 const AVAILABLE_ICONS: Record<string, any> = {
@@ -168,7 +169,7 @@ const MediaCard: React.FC<{
               value={item.name}
               onChange={(e) => onNameChange(item.id, e.target.value)}
               placeholder="Ajouter une description..."
-              className="w-full bg-transparent text-[9px] font-bold text-white/40 uppercase tracking-[0.2em] text-center outline-none focus:text-white/80 transition-colors"
+              className="w-full bg-transparent text-[7px] font-bold text-white/40 uppercase tracking-[0.2em] text-center outline-none focus:text-white/80 transition-colors"
             />
             {onCategoryChange && (
               <select
@@ -184,7 +185,7 @@ const MediaCard: React.FC<{
             )}
           </div>
         ) : (
-          <div className="text-[9px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">
+          <div className="text-[7px] font-bold text-white/20 uppercase tracking-[0.2em] text-center">
             {item.name || "Sans titre"}
           </div>
         )}
@@ -235,6 +236,8 @@ export default function App() {
   const [newLinkTitle, setNewLinkTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("https://");
   const [newLinkIcon, setNewLinkIcon] = useState("Link");
+  const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
+  const [showAddLinkForm, setShowAddLinkForm] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
@@ -398,6 +401,7 @@ export default function App() {
     setData(newData);
     saveToBackend(newData);
     setNewCategoryName("");
+    setShowAddCategoryForm(false);
   };
 
   const removeCategory = (id: string) => {
@@ -449,6 +453,7 @@ export default function App() {
     setNewLinkTitle("");
     setNewLinkUrl("https://");
     setNewLinkIcon("Link");
+    setShowAddLinkForm(false);
   };
 
   const removeCustomLink = (id: string) => {
@@ -763,41 +768,55 @@ export default function App() {
                   ))}
 
                   {/* Add New Link Form */}
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10 border-dashed space-y-3 text-left">
-                    <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Nouveau Lien</span>
-                    <div className="flex gap-2">
-                      <select 
-                        value={newLinkIcon}
-                        onChange={(e) => setNewLinkIcon(e.target.value)}
-                        className="bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-2 py-1"
-                      >
-                        {Object.keys(AVAILABLE_ICONS).map(iconName => (
-                          <option key={iconName} value={iconName}>{iconName}</option>
-                        ))}
-                      </select>
+                  {showAddLinkForm ? (
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 border-dashed space-y-3 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Nouveau Lien</span>
+                        <button onClick={() => setShowAddLinkForm(false)} className="text-white/20 hover:text-white/60 transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <select 
+                          value={newLinkIcon}
+                          onChange={(e) => setNewLinkIcon(e.target.value)}
+                          className="bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-2 py-1"
+                        >
+                          {Object.keys(AVAILABLE_ICONS).map(iconName => (
+                            <option key={iconName} value={iconName}>{iconName}</option>
+                          ))}
+                        </select>
+                        <input 
+                          type="text"
+                          value={newLinkTitle}
+                          onChange={(e) => setNewLinkTitle(e.target.value)}
+                          className="flex-1 bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
+                          placeholder="Titre du lien..."
+                        />
+                      </div>
                       <input 
                         type="text"
-                        value={newLinkTitle}
-                        onChange={(e) => setNewLinkTitle(e.target.value)}
-                        className="flex-1 bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
-                        placeholder="Titre du lien..."
+                        value={newLinkUrl}
+                        onChange={(e) => setNewLinkUrl(e.target.value)}
+                        className="w-full bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
+                        placeholder="URL (https://...)"
                       />
+                      <button 
+                        onClick={addCustomLink}
+                        disabled={!newLinkTitle.trim()}
+                        className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 hover:bg-emerald-500/30 transition-all text-[9px] font-bold uppercase tracking-widest text-emerald-400 disabled:opacity-50"
+                      >
+                        <Check className="w-3 h-3" /> Confirmer le Lien
+                      </button>
                     </div>
-                    <input 
-                      type="text"
-                      value={newLinkUrl}
-                      onChange={(e) => setNewLinkUrl(e.target.value)}
-                      className="w-full bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
-                      placeholder="URL (https://...)"
-                    />
+                  ) : (
                     <button 
-                      onClick={addCustomLink}
-                      disabled={!newLinkTitle.trim()}
-                      className="w-full flex items-center justify-center gap-2 py-2 bg-emerald-500/20 rounded-xl border border-emerald-500/20 hover:bg-emerald-500/30 transition-all text-[9px] font-bold uppercase tracking-widest text-emerald-400 disabled:opacity-50"
+                      onClick={() => setShowAddLinkForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all text-[9px] font-bold uppercase tracking-widest text-white/40"
                     >
-                      <Check className="w-3 h-3" /> Confirmer le Lien
+                      <Plus className="w-3 h-3" /> Ajouter un Lien
                     </button>
-                  </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -922,25 +941,39 @@ export default function App() {
                   </div>
 
                   {/* Add New Category Form */}
-                  <div className="pt-4 border-t border-white/5 space-y-3">
-                    <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Nouvelle Catégorie</span>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="flex-1 bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
-                        placeholder="Nom de la catégorie..."
-                      />
-                      <button 
-                        onClick={addCategory}
-                        disabled={!newCategoryName.trim()}
-                        className="px-4 py-1 bg-emerald-500/20 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/30 transition-all text-[9px] font-bold uppercase tracking-widest text-emerald-400 disabled:opacity-50"
-                      >
-                        OK
-                      </button>
+                  {showAddCategoryForm ? (
+                    <div className="pt-4 border-t border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-bold text-white/40 uppercase tracking-widest">Nouvelle Catégorie</span>
+                        <button onClick={() => setShowAddCategoryForm(false)} className="text-white/20 hover:text-white/60 transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="flex-1 bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
+                          placeholder="Nom de la catégorie..."
+                        />
+                        <button 
+                          onClick={addCategory}
+                          disabled={!newCategoryName.trim()}
+                          className="px-4 py-1 bg-emerald-500/20 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/30 transition-all text-[9px] font-bold uppercase tracking-widest text-emerald-400 disabled:opacity-50"
+                        >
+                          OK
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <button 
+                      onClick={() => setShowAddCategoryForm(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-all text-[9px] font-bold uppercase tracking-widest text-white/40"
+                    >
+                      <Plus className="w-3 h-3" /> Créer une Catégorie
+                    </button>
+                  )}
                 </div>
               )}
 
