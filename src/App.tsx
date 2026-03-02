@@ -344,8 +344,8 @@ export default function App() {
 
     fetchData(true);
     
-    // Poll every 10 seconds for updates from other sessions
-    const interval = setInterval(() => fetchData(false), 10000);
+    // Poll every 3 seconds for updates from other sessions
+    const interval = setInterval(() => fetchData(false), 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -671,6 +671,13 @@ export default function App() {
       />
 
       <div className="w-full max-w-[420px] z-10 space-y-4">
+        {/* Info Banner */}
+        <div className="text-center px-6 py-3 bg-white/[0.02] backdrop-blur-md rounded-2xl border border-white/5 mb-2">
+          <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.15em] leading-relaxed">
+            Pour plus de vidéos rejoignez le serveur discord et pingez (ou venez par e-mail)
+          </p>
+        </div>
+
         {/* Profile Card */}
         <div className="glass rounded-[2rem] p-8 text-center relative overflow-hidden noise-bg">
           {/* Top Controls */}
