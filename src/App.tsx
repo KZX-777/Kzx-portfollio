@@ -318,21 +318,23 @@ export default function App() {
 
   // Fetch data on mount and poll for updates
   useEffect(() => {
-    const fetchData = async (isInitial = false) => {
+    const fetchData = async (isInitial = false, shouldIncrementViews = false) => {
       try {
         const res = await fetch("/api/portfolio");
         const json = await res.json();
+        
         if (json && Object.keys(json).length > 1) {
-          // Only update if not currently saving to avoid race conditions
           setData(prev => {
-            // If we're admin and just saved, we might have more recent local state
-            // but the server cache is updated instantly too, so it's usually safe.
+            // If we are admin or currently saving, we only want to update the view count from the server
+            // to avoid overwriting our local changes while editing or saving.
+            if ((isAdmin || isSaving) && !isInitial) {
+              return { ...prev, views: json.views };
+            }
             return { ...prev, ...json };
           });
         }
         
-        if (isInitial) {
-          // Increment views only on first load
+        if (shouldIncrementViews) {
           const viewRes = await fetch("/api/views", { method: "POST" });
           const viewJson = await viewRes.json();
           setData(prev => ({ ...prev, views: viewJson.views }));
@@ -342,12 +344,13 @@ export default function App() {
       }
     };
 
-    fetchData(true);
+    // Initial load: fetch data and increment views only if not already admin
+    fetchData(true, !isAdmin);
     
-    // Poll every 3 seconds for updates from other sessions
-    const interval = setInterval(() => fetchData(false), 3000);
+    // Poll every 3 seconds for updates (don't increment views during polling)
+    const interval = setInterval(() => fetchData(false, false), 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdmin, isSaving]);
 
   // Handle Music Play/Pause
   const toggleMusic = () => {
