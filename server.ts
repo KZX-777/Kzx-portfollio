@@ -14,24 +14,19 @@ const __dirname = path.dirname(__filename);
 let db: any = null;
 
 const getDb = async () => {
+  if (process.env.NODE_ENV === "production") return null; // Never use SQLite on Vercel
+  
   if (!db) {
     try {
       const Database = (await import("better-sqlite3")).default;
       db = new Database("portfolio.db");
       db.exec(`
-        CREATE TABLE IF NOT EXISTS portfolio (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          data TEXT
-        );
-        CREATE TABLE IF NOT EXISTS views (
-          id INTEGER PRIMARY KEY CHECK (id = 1),
-          count INTEGER DEFAULT 0
-        );
+        CREATE TABLE IF NOT EXISTS portfolio (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT);
+        CREATE TABLE IF NOT EXISTS views (id INTEGER PRIMARY KEY CHECK (id = 1), count INTEGER DEFAULT 0);
         INSERT OR IGNORE INTO portfolio (id, data) VALUES (1, '{}');
         INSERT OR IGNORE INTO views (id, count) VALUES (1, 0);
       `);
     } catch (e) {
-      console.error("Failed to load SQLite (expected on serverless)", e);
       return null;
     }
   }
@@ -64,6 +59,16 @@ if (supabase) {
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
+
+// Debug Route
+app.get("/api/debug", (req, res) => {
+  res.json({
+    env: process.env.NODE_ENV,
+    hasUrl: !!process.env.SUPABASE_URL,
+    hasKey: !!process.env.SUPABASE_KEY,
+    supabaseActive: !!supabase
+  });
+});
 
 // API Routes
 app.get("/api/portfolio", async (req, res) => {
@@ -156,7 +161,7 @@ export default app; // Export for Vercel
 async function startServer() {
   const PORT = 3000;
 
-  // Vite middleware for development
+  // Vite middleware for development ONLY
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -167,12 +172,8 @@ async function startServer() {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on http://localhost:${PORT}`);
     });
-  } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
-    });
   }
+  // Note: In production, Vercel handles static files via vercel.json rewrites
 }
 
 startServer();
