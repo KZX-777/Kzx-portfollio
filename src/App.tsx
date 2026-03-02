@@ -121,14 +121,21 @@ const MediaCard: React.FC<{
   onRemove?: (id: string) => void; 
   onNameChange?: (id: string, name: string) => void;
   onCategoryChange?: (id: string, categoryId: string) => void;
+  onClick?: (item: MediaItem) => void;
   categories: Category[];
   isAdmin: boolean 
-}> = ({ item, onRemove, onNameChange, onCategoryChange, categories, isAdmin }) => {
+}> = ({ item, onRemove, onNameChange, onCategoryChange, onClick, categories, isAdmin }) => {
   return (
-    <div className="glass rounded-2xl overflow-hidden relative group">
+    <div 
+      className="glass rounded-2xl overflow-hidden relative group cursor-pointer"
+      onClick={() => onClick?.(item)}
+    >
       {isAdmin && onRemove && (
         <button 
-          onClick={() => onRemove(item.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(item.id);
+          }}
           className="absolute top-3 right-3 z-30 p-2 bg-red-500/20 backdrop-blur-md border border-red-500/20 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/40"
         >
           <Trash2 className="w-3.5 h-3.5 text-white" />
@@ -164,7 +171,7 @@ const MediaCard: React.FC<{
       </div>
       <div className="p-3 bg-white/[0.01] border-t border-white/[0.03]">
         {isAdmin && onNameChange ? (
-          <div className="space-y-2">
+          <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
             <input 
               type="text"
               value={item.name}
@@ -190,6 +197,51 @@ const MediaCard: React.FC<{
             {item.name || "Sans titre"}
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const MediaModal: React.FC<{ 
+  item: MediaItem | null; 
+  onClose: () => void 
+}> = ({ item, onClose }) => {
+  if (!item) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8">
+      <div 
+        className="absolute inset-0 bg-black/90 backdrop-blur-xl"
+        onClick={onClose}
+      />
+      
+      <div className="relative w-full max-w-5xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in duration-300">
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 z-50 p-3 bg-white/10 hover:bg-white/20 rounded-full border border-white/10 transition-all"
+        >
+          <X className="w-5 h-5 text-white" />
+        </button>
+
+        {item.type === 'video' ? (
+          <video 
+            src={item.url} 
+            className="w-full h-full"
+            controls
+            autoPlay
+          />
+        ) : (
+          <img 
+            src={item.url} 
+            alt={item.name} 
+            className="w-full h-full object-contain"
+            referrerPolicy="no-referrer"
+          />
+        )}
+        
+        <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
+          <h3 className="text-lg font-bold text-white uppercase tracking-widest">{item.name || "Sans titre"}</h3>
+        </div>
       </div>
     </div>
   );
@@ -241,6 +293,7 @@ export default function App() {
   const [newLinkIcon, setNewLinkIcon] = useState("Link");
   const [showAddCategoryForm, setShowAddCategoryForm] = useState(false);
   const [showAddLinkForm, setShowAddLinkForm] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
@@ -598,6 +651,12 @@ export default function App() {
           <div className="absolute bottom-[-20%] right-[-10%] w-[70%] h-[70%] bg-white/[0.01] rounded-full blur-[120px]" />
         </div>
       )}
+
+      {/* Media Viewer Modal */}
+      <MediaModal 
+        item={selectedMedia} 
+        onClose={() => setSelectedMedia(null)} 
+      />
 
       <div className="w-full max-w-[420px] z-10 space-y-4">
         {/* Profile Card */}
@@ -1099,6 +1158,7 @@ export default function App() {
                           onRemove={(id) => removeMedia(id, 'image')} 
                           onNameChange={(id, name) => updateMediaName(id, 'image', name)}
                           onCategoryChange={(id, catId) => updateMediaCategory(id, 'image', catId)}
+                          onClick={setSelectedMedia}
                           categories={data.categories}
                           isAdmin={isAdmin} 
                         />
@@ -1110,6 +1170,7 @@ export default function App() {
                           onRemove={(id) => removeMedia(id, 'video')} 
                           onNameChange={(id, name) => updateMediaName(id, 'video', name)}
                           onCategoryChange={(id, catId) => updateMediaCategory(id, 'video', catId)}
+                          onClick={setSelectedMedia}
                           categories={data.categories}
                           isAdmin={isAdmin} 
                         />
@@ -1134,6 +1195,7 @@ export default function App() {
                         onRemove={(id) => removeMedia(id, 'image')} 
                         onNameChange={(id, name) => updateMediaName(id, 'image', name)}
                         onCategoryChange={(id, catId) => updateMediaCategory(id, 'image', catId)}
+                        onClick={setSelectedMedia}
                         categories={data.categories}
                         isAdmin={isAdmin} 
                       />
@@ -1156,6 +1218,7 @@ export default function App() {
                         onRemove={(id) => removeMedia(id, 'video')} 
                         onNameChange={(id, name) => updateMediaName(id, 'video', name)}
                         onCategoryChange={(id, catId) => updateMediaCategory(id, 'video', catId)}
+                        onClick={setSelectedMedia}
                         categories={data.categories}
                         isAdmin={isAdmin} 
                       />
