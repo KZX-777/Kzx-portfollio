@@ -326,16 +326,31 @@ export default function App() {
   };
 
   // Handle File Selections
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'music' | 'image' | 'video') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'music' | 'image' | 'video') => {
     if (!isAdmin) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      let newData = { ...data };
+    // Check size for videos (max 5MB to be safe with Base64 overhead)
+    if (type === 'video' && file.size > 5 * 1024 * 1024) {
+      alert("Cette vidéo est trop lourde (max 5Mo). Veuillez la compresser avant de l'ajouter.");
+      return;
+    }
 
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      let base64 = event.target?.result as string;
+
+      // Compress images if they are large
+      if (type === 'image' || type === 'profile') {
+        try {
+          base64 = await compressImage(base64);
+        } catch (err) {
+          console.error("Compression failed", err);
+        }
+      }
+
+      let newData = { ...data };
       if (type === 'profile') {
         newData.profileImg = base64;
       } else if (type === 'music') {
@@ -351,6 +366,39 @@ export default function App() {
       saveToBackend(newData);
     };
     reader.readAsDataURL(file);
+  };
+
+  // Helper to compress images using canvas
+  const compressImage = (base64: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Max dimension 1200px
+        const MAX_SIZE = 1200;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality
+      };
+    });
   };
 
   const removeMedia = (id: string, type: 'image' | 'video') => {

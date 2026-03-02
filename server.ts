@@ -139,7 +139,11 @@ app.post("/api/portfolio", async (req, res) => {
     res.json(result);
   } catch (err: any) {
     console.error("Save error:", err);
-    res.status(500).json({ error: err.message || "Erreur lors de la sauvegarde" });
+    let msg = err.message || "Erreur lors de la sauvegarde";
+    if (msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("canceling statement")) {
+      msg = "Données trop lourdes : Vos images ou vidéos dépassent la capacité de la base de données. Essayez de mettre des fichiers plus légers.";
+    }
+    res.status(500).json({ error: msg });
   }
 });
 
