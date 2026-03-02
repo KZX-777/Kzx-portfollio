@@ -1,6 +1,5 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
@@ -12,21 +11,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Database Setup ---
-const db = new Database("portfolio.db");
+let db: any = null;
 
-// Initialize Local DB (Fallback)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS portfolio (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    data TEXT
-  );
-  CREATE TABLE IF NOT EXISTS views (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    count INTEGER DEFAULT 0
-  );
-  INSERT OR IGNORE INTO portfolio (id, data) VALUES (1, '{}');
-  INSERT OR IGNORE INTO views (id, count) VALUES (1, 0);
-`);
+const getDb = async () => {
+  if (!db) {
+    try {
+      const Database = (await import("better-sqlite3")).default;
+      db = new Database("portfolio.db");
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS portfolio (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          data TEXT
+        );
+        CREATE TABLE IF NOT EXISTS views (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          count INTEGER DEFAULT 0
+        );
+        INSERT OR IGNORE INTO portfolio (id, data) VALUES (1, '{}');
+        INSERT OR IGNORE INTO views (id, count) VALUES (1, 0);
+      `);
+    } catch (e) {
+      console.error("Failed to load SQLite (expected on serverless)", e);
+      return null;
+    }
+  }
+  return db;
+};
 
 // --- Supabase Setup (Cloud Persistence) ---
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -52,8 +62,10 @@ if (supabase) {
   console.log("📂 Using local SQLite storage (No Supabase keys found).");
 }
 
+const app = express();
+export default app; // Export for Vercel
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
@@ -76,9 +88,14 @@ async function startServer() {
     }
 
     // SQLite Fallback
-    const row = db.prepare("SELECT data FROM portfolio WHERE id = 1").get() as { data: string };
-    const views = db.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
-    res.json({ ...JSON.parse(row.data), views: views.count });
+    const database = await getDb();
+    if (database) {
+      const row = database.prepare("SELECT data FROM portfolio WHERE id = 1").get() as { data: string };
+      const views = database.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
+      res.json({ ...JSON.parse(row.data), views: views.count });
+    } else {
+      res.json({ views: 0 });
+    }
   });
 
   app.post("/api/portfolio", async (req, res) => {
@@ -96,7 +113,10 @@ async function startServer() {
         return res.status(500).json({ error: "Configuration Supabase manquante sur Vercel. Vérifiez vos variables d'environnement (SUPABASE_URL et SUPABASE_KEY)." });
       } else {
         // SQLite Fallback (Local only)
-        db.prepare("UPDATE portfolio SET data = ? WHERE id = 1").run(JSON.stringify(data));
+        const database = await getDb();
+        if (database) {
+          database.prepare("UPDATE portfolio SET data = ? WHERE id = 1").run(JSON.stringify(data));
+        }
         return res.json({ success: true });
       }
     } catch (err: any) {
@@ -116,9 +136,13 @@ async function startServer() {
         return res.json({ views: 0 }); // Ignore views if no DB on production
       } else {
         // SQLite Fallback
-        db.prepare("UPDATE views SET count = count + 1 WHERE id = 1").run();
-        const views = db.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
-        return res.json({ views: views.count });
+        const database = await getDb();
+        if (database) {
+          database.prepare("UPDATE views SET count = count + 1 WHERE id = 1").run();
+          const views = database.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
+          return res.json({ views: views.count });
+        }
+        return res.json({ views: 0 });
       }
     } catch (err) {
       console.error("Views error:", err);
@@ -140,9 +164,11 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
