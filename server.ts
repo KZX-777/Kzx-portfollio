@@ -67,10 +67,20 @@ app.post("/api/views", async (req, res) => {
 export default app;
 
 async function startServer() {
+  const PORT = Number(process.env.PORT) || 3000;
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
-    app.listen(3000, "0.0.0.0", () => console.log("Server: http://localhost:3000"));
+    app.listen(PORT, "0.0.0.0", () => console.log(`Dev Server: http://localhost:${PORT}`));
+  } else {
+    // Production: Serve static files from dist
+    app.use(express.static(path.join(__dirname, "dist")));
+    app.get("*", (req, res) => {
+      if (req.path.startsWith('/api')) return res.status(404).json({ error: "Not found" });
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    });
+    app.listen(PORT, "0.0.0.0", () => console.log(`Production Server running on port ${PORT}`));
   }
 }
 startServer();
