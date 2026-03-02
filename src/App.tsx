@@ -73,6 +73,7 @@ interface PortfolioData {
   images: MediaItem[];
   videos: MediaItem[];
   musicUrl: string | null;
+  musicTitle: string | null;
   pricing: PriceItem[];
   email: string;
   views: number;
@@ -210,6 +211,7 @@ export default function App() {
     images: [],
     videos: [],
     musicUrl: null,
+    musicTitle: null,
     pricing: [
       { service: "Scripting (Roblox)", price: "À partir de 500 Robux" },
       { service: "UI Design (Roblox)", price: "À partir de 200 Robux" },
@@ -555,16 +557,23 @@ export default function App() {
           {/* Top Controls */}
           <div className="absolute top-6 right-6 flex items-center gap-2">
             {data.musicUrl && (
-              <button 
-                onClick={toggleMusic}
-                className="flex items-center justify-center w-8 h-8 bg-white/5 rounded-full border border-white/5 hover:bg-white/10 transition-all"
-              >
-                {isPlaying ? (
-                  <Volume2 className="w-3.5 h-3.5 text-white" />
-                ) : (
-                  <VolumeX className="w-3.5 h-3.5 text-white/30" />
+              <div className="flex flex-col items-end gap-1">
+                <button 
+                  onClick={toggleMusic}
+                  className="flex items-center justify-center w-8 h-8 bg-white/5 rounded-full border border-white/5 hover:bg-white/10 transition-all"
+                >
+                  {isPlaying ? (
+                    <Volume2 className="w-3.5 h-3.5 text-white" />
+                  ) : (
+                    <VolumeX className="w-3.5 h-3.5 text-white/30" />
+                  )}
+                </button>
+                {data.musicTitle && (
+                  <span className="text-[7px] font-bold text-white/20 uppercase tracking-widest animate-pulse">
+                    ♫ {data.musicTitle}
+                  </span>
                 )}
-              </button>
+              </div>
             )}
           </div>
 
@@ -658,68 +667,91 @@ export default function App() {
             </div>
           </div>
 
-          {/* Contact Section */}
-          <div className="mt-8">
-            <SectionHeader title="Contact" icon={Mail} />
-            <div className="grid grid-cols-2 gap-3">
+          {/* Contact Section - Aesthetic & Prominent */}
+          <div className="mt-10">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div className="h-[1px] w-8 bg-gradient-to-r from-transparent to-white/10" />
+              <h2 className="text-[9px] font-bold uppercase tracking-[0.4em] text-white/30 font-display">Get in Touch</h2>
+              <div className="h-[1px] w-8 bg-gradient-to-l from-transparent to-white/10" />
+            </div>
+            
+            <div className="grid grid-cols-1 gap-3">
               {isAdmin ? (
-                <div className="col-span-2 flex flex-col gap-2">
-                  <div className="flex items-center gap-2 py-2.5 px-3 bg-white/5 rounded-2xl border border-white/5 font-bold text-xs">
-                    <Mail className="w-4 h-4 text-white/40" />
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3 py-3 px-4 bg-white/5 rounded-2xl border border-white/10 font-bold text-xs">
+                    <Mail className="w-4 h-4 text-emerald-400/60" />
                     <input 
                       type="text"
                       value={data.email}
                       onChange={(e) => updateField('email', e.target.value)}
-                      className="bg-transparent outline-none w-full text-[10px]"
+                      className="bg-transparent outline-none w-full text-[10px] text-white/80"
                       placeholder="Email"
                     />
                   </div>
-                  <div className="flex items-center gap-2 py-2.5 px-3 bg-white/5 rounded-2xl border border-white/5 font-bold text-xs">
-                    <DiscordLogo className="w-4 h-4 text-white/40" />
+                  <div className="flex items-center gap-3 py-3 px-4 bg-white/5 rounded-2xl border border-white/10 font-bold text-xs">
+                    <DiscordLogo className="w-4 h-4 text-indigo-400/60" />
                     <input 
                       type="text"
                       value={data.discordLink}
                       onChange={(e) => updateField('discordLink', e.target.value)}
-                      className="bg-transparent outline-none w-full text-[10px]"
+                      className="bg-transparent outline-none w-full text-[10px] text-white/80"
                       placeholder="Lien Discord"
                     />
                   </div>
                 </div>
               ) : (
-                <>
+                <div className="flex flex-col gap-3">
                   <a 
                     href={`mailto:${data.email}`}
-                    className="flex flex-col items-start gap-2 p-4 bg-white/[0.02] rounded-2xl border border-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                    className="flex items-center justify-between p-4 bg-gradient-to-br from-white/[0.03] to-transparent rounded-2xl border border-white/[0.05] hover:border-emerald-500/30 hover:bg-emerald-500/[0.02] transition-all group relative overflow-hidden"
                   >
-                    <Mail className="w-5 h-5 text-emerald-400/60 group-hover:text-emerald-400 transition-colors" />
-                    <div className="text-left">
-                      <p className="text-[7px] text-white/10 uppercase tracking-[0.2em] font-bold">Direct</p>
-                      <p className="text-[10px] font-bold text-white/60 group-hover:text-white/90 transition-colors truncate w-full">Email</p>
+                    <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className="w-10 h-10 flex items-center justify-center bg-emerald-500/10 rounded-xl border border-emerald-500/10 group-hover:scale-110 transition-transform">
+                        <Mail className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[7px] text-white/20 uppercase tracking-[0.2em] font-bold mb-0.5">Professional</p>
+                        <p className="text-[11px] font-bold text-white/80 group-hover:text-white transition-colors">Contact par Email</p>
+                      </div>
                     </div>
+                    <ChevronDown className="w-4 h-4 text-white/10 -rotate-90 group-hover:translate-x-1 transition-all" />
                   </a>
+
                   <a 
                     href={data.discordLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex flex-col items-start gap-2 p-4 bg-white/[0.02] rounded-2xl border border-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                    className="flex items-center justify-between p-4 bg-gradient-to-br from-white/[0.03] to-transparent rounded-2xl border border-white/[0.05] hover:border-indigo-500/30 hover:bg-indigo-500/[0.02] transition-all group relative overflow-hidden"
                   >
-                    <DiscordLogo className="w-5 h-5 text-indigo-400/60 group-hover:text-indigo-400 transition-colors" />
-                    <div className="text-left">
-                      <p className="text-[7px] text-white/10 uppercase tracking-[0.2em] font-bold">Community</p>
-                      <p className="text-[10px] font-bold text-white/60 group-hover:text-white/90 transition-colors truncate w-full">Discord</p>
+                    <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className="w-10 h-10 flex items-center justify-center bg-indigo-500/10 rounded-xl border border-indigo-500/10 group-hover:scale-110 transition-transform">
+                        <DiscordLogo className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[7px] text-white/20 uppercase tracking-[0.2em] font-bold mb-0.5">Community</p>
+                        <p className="text-[11px] font-bold text-white/80 group-hover:text-white transition-colors">Rejoindre le Discord</p>
+                      </div>
                     </div>
+                    <ChevronDown className="w-4 h-4 text-white/10 -rotate-90 group-hover:translate-x-1 transition-all" />
                   </a>
-                </>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Other Links Section */}
-          <div className="mt-8">
-            <SectionHeader title="Autres Liens" icon={ExternalLink} />
-            <div className="grid grid-cols-2 gap-3">
+          {/* Other Links Section - Compact & Minimal */}
+          <div className="mt-10">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="h-[1px] w-4 bg-white/5" />
+              <h2 className="text-[8px] font-bold uppercase tracking-[0.3em] text-white/20">Socials & Links</h2>
+              <div className="h-[1px] w-4 bg-white/5" />
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-3">
               {isAdmin ? (
-                <div className="col-span-2 flex flex-col gap-2">
+                <div className="w-full flex flex-col gap-2">
                   <div className="flex items-center gap-2 py-2.5 px-3 bg-white/5 rounded-2xl border border-white/5 font-bold text-xs">
                     <GithubLogo className="w-4 h-4 text-white/40" />
                     <input 
@@ -830,30 +862,24 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                <>
+                <div className="flex flex-wrap justify-center gap-4">
                   <a 
                     href={data.robloxLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex flex-col items-start gap-2 p-4 bg-white/[0.02] rounded-2xl border border-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                    className="w-12 h-12 flex items-center justify-center bg-white/[0.03] rounded-2xl border border-white/[0.05] hover:bg-white/[0.1] hover:scale-110 transition-all group"
+                    title="Roblox"
                   >
-                    <RobloxLogo className="w-5 h-5 text-zinc-400/60 group-hover:text-white transition-colors" />
-                    <div className="text-left">
-                      <p className="text-[7px] text-white/10 uppercase tracking-[0.2em] font-bold">Platform</p>
-                      <p className="text-[10px] font-bold text-white/60 group-hover:text-white/90 transition-colors">Roblox</p>
-                    </div>
+                    <RobloxLogo className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
                   </a>
                   <a 
                     href={data.githubLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex flex-col items-start gap-2 p-4 bg-white/[0.02] rounded-2xl border border-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                    className="w-12 h-12 flex items-center justify-center bg-white/[0.03] rounded-2xl border border-white/[0.05] hover:bg-white/[0.1] hover:scale-110 transition-all group"
+                    title="GitHub"
                   >
-                    <GithubLogo className="w-5 h-5 text-zinc-400/60 group-hover:text-zinc-400 transition-colors" />
-                    <div className="text-left">
-                      <p className="text-[7px] text-white/10 uppercase tracking-[0.2em] font-bold">Source</p>
-                      <p className="text-[10px] font-bold text-white/60 group-hover:text-white/90 transition-colors">GitHub</p>
-                    </div>
+                    <GithubLogo className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
                   </a>
                   {data.customLinks.map(link => {
                     const Icon = AVAILABLE_ICONS[link.icon] || Link;
@@ -863,29 +889,37 @@ export default function App() {
                         href={link.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex flex-col items-start gap-2 p-4 bg-white/[0.02] rounded-2xl border border-white/[0.03] hover:bg-white/[0.05] transition-all group"
+                        className="w-12 h-12 flex items-center justify-center bg-white/[0.03] rounded-2xl border border-white/[0.05] hover:bg-white/[0.1] hover:scale-110 transition-all group"
+                        title={link.title}
                       >
-                        <Icon className="w-5 h-5 text-white/30 group-hover:text-white transition-colors" />
-                        <div className="text-left">
-                          <p className="text-[7px] text-white/10 uppercase tracking-[0.2em] font-bold">Link</p>
-                          <p className="text-[10px] font-bold text-white/60 group-hover:text-white/90 transition-colors truncate w-full">{link.title}</p>
-                        </div>
+                        <Icon className="w-5 h-5 text-white/40 group-hover:text-white transition-colors" />
                       </a>
                     );
                   })}
-                </>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-8 space-y-3">
             {isAdmin && (
-              <button 
-                onClick={() => musicInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 rounded-xl border border-white/20 hover:bg-white/20 transition-all font-bold text-xs"
-              >
-                <Music className="w-4 h-4" /> {data.musicUrl ? "Changer la Musique" : "Ajouter une Musique"}
-              </button>
+              <div className="space-y-2">
+                <button 
+                  onClick={() => musicInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/10 rounded-xl border border-white/20 hover:bg-white/20 transition-all font-bold text-xs"
+                >
+                  <Music className="w-4 h-4" /> {data.musicUrl ? "Changer la Musique" : "Ajouter une Musique"}
+                </button>
+                {data.musicUrl && (
+                  <input 
+                    type="text"
+                    placeholder="Titre de la musique (Crédits)..."
+                    value={data.musicTitle || ""}
+                    onChange={(e) => updateField('musicTitle', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl text-[10px] text-white outline-none px-4 py-2 focus:border-white/20 transition-all text-center"
+                  />
+                )}
+              </div>
             )}
             
             <input 
@@ -912,7 +946,14 @@ export default function App() {
             </button>
             {isAdmin && (
               <div className="flex gap-2">
-                <button onClick={addCategory} className="p-1.5 glass rounded-lg hover:bg-white/10 transition-all" title="Ajouter Catégorie">
+                <button 
+                  onClick={() => {
+                    setShowMedia(true);
+                    setShowAddCategoryForm(true);
+                  }} 
+                  className="p-1.5 glass rounded-lg hover:bg-white/10 transition-all" 
+                  title="Ajouter Catégorie"
+                >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
                 <button onClick={() => imageInputRef.current?.click()} className="p-1.5 glass rounded-lg hover:bg-white/10 transition-all" title="Ajouter Image">
@@ -965,8 +1006,10 @@ export default function App() {
                           type="text"
                           value={newCategoryName}
                           onChange={(e) => setNewCategoryName(e.target.value)}
+                          autoFocus
                           className="flex-1 bg-white/10 border border-white/10 rounded-lg text-[10px] text-white outline-none px-3 py-1"
                           placeholder="Nom de la catégorie..."
+                          onKeyDown={(e) => e.key === 'Enter' && addCategory()}
                         />
                         <button 
                           onClick={addCategory}

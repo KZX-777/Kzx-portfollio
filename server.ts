@@ -11,15 +11,62 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Supabase Setup ---
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL?.trim();
+const supabaseKey = process.env.SUPABASE_KEY?.trim();
 
-const supabase = (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http'))
-  ? createClient(supabaseUrl, supabaseKey) 
+const isSupabaseValid = (url?: string, key?: string) => {
+  if (!url || !key) return false;
+  if (url === "undefined" || key === "undefined") return false;
+  if (!url.startsWith('http')) return false;
+  return true;
+};
+
+if (!isSupabaseValid(supabaseUrl, supabaseKey)) {
+  console.warn("⚠️ ATTENTION : Supabase n'est pas configuré correctement. Les données ne seront pas sauvegardées.");
+  console.warn("Vérifiez vos variables d'environnement SUPABASE_URL et SUPABASE_KEY sur Render.");
+}
+
+const supabase = isSupabaseValid(supabaseUrl, supabaseKey)
+  ? createClient(supabaseUrl!, supabaseKey!) 
   : null;
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
+
+app.get("/api/debug", (req, res) => {
+  res.json({
+    supabaseConfigured: !!supabase,
+    hasUrl: !!supabaseUrl,
+    hasKey: !!supabaseKey,
+    urlValid: supabaseUrl?.startsWith('http') || false,
+    urlValue: supabaseUrl ? `${supabaseUrl.substring(0, 10)}...` : null,
+    env: process.env.NODE_ENV || "development"
+  });
+});
+
+const DEFAULT_DATA = {
+  profileImg: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kzx",
+  username: "Kzx_off",
+  role: "Développeur Roblox & UI Designer",
+  experience: "4 Mois d'Expérience Passionnée",
+  discordTag: "kzx_off",
+  email: "contact@kzx.dev",
+  discordLink: "https://discord.com/users/kzx_off",
+  robloxLink: "https://www.roblox.com/users/12345678/profile",
+  githubLink: "https://github.com/Kzx-off",
+  pricing: [
+    { service: "Scripting (Roblox)", price: "À partir de 500 Robux" },
+    { service: "UI Design (Roblox)", price: "À partir de 200 Robux" },
+    { service: "Map Design", price: "Sur devis" },
+  ],
+  images: [],
+  videos: [],
+  customLinks: [],
+  categories: [],
+  musicUrl: null,
+  musicTitle: null,
+  backgroundUrl: null
+};
 
 // API Routes
 app.get("/api/portfolio", async (req, res) => {
@@ -27,15 +74,20 @@ app.get("/api/portfolio", async (req, res) => {
     if (supabase) {
       const { data: portfolio } = await supabase.from('portfolio').select('data').eq('id', 1).single();
       const { data: views } = await supabase.from('views').select('count').eq('id', 1).single();
-      return res.json({ 
-        ...(portfolio ? JSON.parse(portfolio.data) : {}), 
-        views: views?.count || 0 
-      });
+      
+      if (portfolio) {
+        return res.json({ 
+          ...JSON.parse(portfolio.data), 
+          views: views?.count || 0 
+        });
+      }
     }
   } catch (err) {
     console.error("Fetch error:", err);
   }
-  res.json({ views: 0 });
+  
+  // Return default data if Supabase is not configured or query fails
+  res.json({ ...DEFAULT_DATA, views: 0 });
 });
 
 app.post("/api/portfolio", async (req, res) => {
@@ -43,7 +95,13 @@ app.post("/api/portfolio", async (req, res) => {
   if (password !== "Ultraadmin275673@772") return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    if (!supabase) throw new Error("Supabase non configuré");
+    if (!supabase) {
+      const missing = [];
+      if (!supabaseUrl || supabaseUrl === "undefined") missing.push("SUPABASE_URL");
+      if (!supabaseKey || supabaseKey === "undefined") missing.push("SUPABASE_KEY");
+      if (supabaseUrl && !supabaseUrl.startsWith('http')) missing.push("SUPABASE_URL (doit commencer par http)");
+      throw new Error(`Supabase non configuré. Problème avec : ${missing.join(", ")}`);
+    }
     const { error } = await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
     if (error) throw error;
     res.json({ success: true });
