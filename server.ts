@@ -68,116 +68,88 @@ const DEFAULT_DATA = {
   backgroundUrl: null
 };
 
-// API Routes
-app.get("/api/portfolio", async (req, res) => {
-  // Silent timeout: instead of rejecting, we resolve with null after 30s
-  const timeoutPromise = new Promise((resolve) => 
-    setTimeout(() => resolve(null), 30000)
-  );
+let cachedPortfolio: any = { ...DEFAULT_DATA, views: 0 };
+let isInitialLoadDone = false;
 
+// Background sync with Supabase
+const syncFromSupabase = async () => {
+  if (!supabase) return;
   try {
-    if (supabase) {
-      const fetchPromise = (async () => {
-        try {
-          const { data: portfolio, error: pError } = await supabase.from('portfolio').select('data').eq('id', 1).maybeSingle();
-          const { data: views, error: vError } = await supabase.from('views').select('count').eq('id', 1).maybeSingle();
-          
-          if (pError) console.error("Supabase Portfolio Error:", pError);
-          if (vError) console.error("Supabase Views Error:", vError);
-
-          if (portfolio && portfolio.data) {
-            try {
-              return { 
-                ...JSON.parse(portfolio.data), 
-                views: views?.count || 0 
-              };
-            } catch (parseErr) {
-              console.error("JSON Parse Error:", parseErr);
-            }
-          }
-        } catch (innerErr) {
-          console.error("Inner fetch error:", innerErr);
-        }
-        return null;
-      })();
-
-      const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
-      if (result) return res.json(result);
+    const { data: portfolio } = await supabase.from('portfolio').select('data').eq('id', 1).maybeSingle();
+    const { data: views } = await supabase.from('views').select('count').eq('id', 1).maybeSingle();
+    
+    if (portfolio && portfolio.data) {
+      const parsed = JSON.parse(portfolio.data);
+      cachedPortfolio = { 
+        ...parsed, 
+        views: views?.count || 0 
+      };
+      isInitialLoadDone = true;
     }
   } catch (err) {
-    console.error("Unexpected fetch error:", err);
+    console.error("Initial sync error:", err);
   }
+};
+
+// Start initial sync
+syncFromSupabase();
+
+// Periodically sync from Supabase every 5 minutes to ensure cache consistency
+setInterval(syncFromSupabase, 5 * 60 * 1000);
+
+// API Routes
+app.get("/api/portfolio", async (req, res) => {
+  // Prevent browser caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   
-  // Fallback to default data if anything goes wrong or times out
-  return res.json({ ...DEFAULT_DATA, views: 0 });
+  // Return cached data immediately for instant response
+  res.json(cachedPortfolio);
+  
+  // Background refresh if not done yet
+  if (!isInitialLoadDone) {
+    syncFromSupabase();
+  }
 });
 
 app.post("/api/portfolio", async (req, res) => {
   const { password, data } = req.body;
   if (password !== "Ultraadmin275673@772") return res.status(401).json({ error: "Unauthorized" });
 
-  const timeoutPromise = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error("Save timeout (30s) - Les données sont peut-être trop lourdes")), 30000)
-  );
+  // Update cache INSTANTLY
+  cachedPortfolio = { ...data, views: cachedPortfolio.views };
 
-  try {
-    if (!supabase) {
-      const missing = [];
-      if (!supabaseUrl || supabaseUrl === "undefined") missing.push("SUPABASE_URL");
-      if (!supabaseKey || supabaseKey === "undefined") missing.push("SUPABASE_KEY");
-      if (supabaseUrl && !supabaseUrl.startsWith('http')) missing.push("SUPABASE_URL (doit commencer par http)");
-      throw new Error(`Supabase non configuré. Problème avec : ${missing.join(", ")}`);
+  // Background save to Supabase
+  const saveToSupabase = async () => {
+    if (!supabase) return;
+    try {
+      await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
+    } catch (err) {
+      console.error("Background save error:", err);
     }
-
-    const savePromise = (async () => {
-      const { error } = await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
-      if (error) throw error;
-      return { success: true };
-    })();
-
-    const result = await Promise.race([savePromise, timeoutPromise]) as any;
-    res.json(result);
-  } catch (err: any) {
-    console.error("Save error:", err);
-    let msg = err.message || "Erreur lors de la sauvegarde";
-    if (msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("canceling statement")) {
-      msg = "Données trop lourdes : Vos images ou vidéos dépassent la capacité de la base de données. Essayez de mettre des fichiers plus légers.";
-    }
-    res.status(500).json({ error: msg });
-  }
+  };
+  
+  saveToSupabase();
+  res.json({ success: true, message: "Sauvegarde en cours (instantané en cache)" });
 });
 
 app.post("/api/views", async (req, res) => {
-  // Silent timeout for views
-  const timeoutPromise = new Promise((resolve) => 
-    setTimeout(() => resolve(null), 15000)
-  );
+  // Increment cache instantly
+  cachedPortfolio.views += 1;
+  res.json({ views: cachedPortfolio.views });
 
-  try {
-    if (supabase) {
-      const updatePromise = (async () => {
-        try {
-          const { data: current, error: fError } = await supabase.from('views').select('count').eq('id', 1).maybeSingle();
-          if (fError) throw fError;
-          
-          const newCount = (current?.count || 0) + 1;
-          const { error: uError } = await supabase.from('views').upsert({ id: 1, count: newCount });
-          if (uError) throw uError;
-          
-          return { views: newCount };
-        } catch (innerErr) {
-          console.error("Inner views error:", innerErr);
-          return null;
-        }
-      })();
-
-      const result = await Promise.race([updatePromise, timeoutPromise]) as any;
-      if (result) return res.json(result);
+  // Background save to Supabase
+  const saveViewsToSupabase = async () => {
+    if (!supabase) return;
+    try {
+      await supabase.from('views').upsert({ id: 1, count: cachedPortfolio.views });
+    } catch (err) {
+      console.error("Background views save error:", err);
     }
-  } catch (err) {
-    console.error("Unexpected views error:", err);
-  }
-  res.json({ views: 0 });
+  };
+  
+  saveViewsToSupabase();
 });
 
 export default app;

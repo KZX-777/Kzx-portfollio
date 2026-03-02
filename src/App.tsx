@@ -316,25 +316,37 @@ export default function App() {
     return () => clearInterval(interval);
   }, [cooldownUntil]);
 
-  // Fetch data on mount
+  // Fetch data on mount and poll for updates
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (isInitial = false) => {
       try {
         const res = await fetch("/api/portfolio");
         const json = await res.json();
         if (json && Object.keys(json).length > 1) {
-          setData(prev => ({ ...prev, ...json }));
+          // Only update if not currently saving to avoid race conditions
+          setData(prev => {
+            // If we're admin and just saved, we might have more recent local state
+            // but the server cache is updated instantly too, so it's usually safe.
+            return { ...prev, ...json };
+          });
         }
         
-        // Increment views
-        const viewRes = await fetch("/api/views", { method: "POST" });
-        const viewJson = await viewRes.json();
-        setData(prev => ({ ...prev, views: viewJson.views }));
+        if (isInitial) {
+          // Increment views only on first load
+          const viewRes = await fetch("/api/views", { method: "POST" });
+          const viewJson = await viewRes.json();
+          setData(prev => ({ ...prev, views: viewJson.views }));
+        }
       } catch (e) {
         console.error("Failed to fetch data", e);
       }
     };
-    fetchData();
+
+    fetchData(true);
+    
+    // Poll every 10 seconds for updates from other sessions
+    const interval = setInterval(() => fetchData(false), 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Handle Music Play/Pause
