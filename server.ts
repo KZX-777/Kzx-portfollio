@@ -89,25 +89,20 @@ async function startServer() {
 
     try {
       if (supabase) {
-        // Upsert data in Supabase
         const { error } = await supabase.from('portfolio').upsert({ id: 1, data: JSON.stringify(data) });
-        if (error) {
-          console.error("Supabase Upsert Error:", error);
-          throw new Error(`Supabase Error: ${error.message}`);
-        }
+        if (error) throw new Error(`Supabase Error: ${error.message}`);
+        return res.json({ success: true });
+      } else if (process.env.NODE_ENV === "production") {
+        return res.status(500).json({ error: "Configuration Supabase manquante sur Vercel. Vérifiez vos variables d'environnement (SUPABASE_URL et SUPABASE_KEY)." });
+      } else {
+        // SQLite Fallback (Local only)
+        db.prepare("UPDATE portfolio SET data = ? WHERE id = 1").run(JSON.stringify(data));
         return res.json({ success: true });
       }
     } catch (err: any) {
-      console.error("Supabase save error:", err);
-      // Don't fallback to SQLite on Vercel as it's read-only/volatile
-      if (process.env.NODE_ENV === "production") {
-        return res.status(500).json({ error: err.message || "Erreur de sauvegarde Cloud" });
-      }
+      console.error("Save error:", err);
+      return res.status(500).json({ error: err.message || "Erreur de sauvegarde" });
     }
-
-    // SQLite Fallback
-    db.prepare("UPDATE portfolio SET data = ? WHERE id = 1").run(JSON.stringify(data));
-    res.json({ success: true });
   });
 
   app.post("/api/views", async (req, res) => {
@@ -117,15 +112,18 @@ async function startServer() {
         const newCount = (current?.count || 0) + 1;
         await supabase.from('views').upsert({ id: 1, count: newCount });
         return res.json({ views: newCount });
+      } else if (process.env.NODE_ENV === "production") {
+        return res.json({ views: 0 }); // Ignore views if no DB on production
+      } else {
+        // SQLite Fallback
+        db.prepare("UPDATE views SET count = count + 1 WHERE id = 1").run();
+        const views = db.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
+        return res.json({ views: views.count });
       }
     } catch (err) {
-      console.error("Supabase views error, falling back to SQLite", err);
+      console.error("Views error:", err);
+      return res.json({ views: 0 });
     }
-
-    // SQLite Fallback
-    db.prepare("UPDATE views SET count = count + 1 WHERE id = 1").run();
-    const views = db.prepare("SELECT count FROM views WHERE id = 1").get() as { count: number };
-    res.json({ views: views.count });
   });
 
   // Vite middleware for development

@@ -304,11 +304,17 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword, data: newData })
       });
-      if (res.status === 401) {
-        setIsAdmin(false);
-        throw new Error("Session expirée ou mot de passe incorrect.");
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage = errorData.error || `Erreur ${res.status}`;
+        
+        if (res.status === 401) {
+          setIsAdmin(false);
+          throw new Error("Session expirée ou mot de passe incorrect.");
+        }
+        throw new Error(errorMessage);
       }
-      if (!res.ok) throw new Error("Erreur de serveur");
     } catch (e: any) {
       console.error("Save error:", e);
       alert(e.message || "Erreur lors de la sauvegarde. Vérifiez votre connexion.");
