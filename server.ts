@@ -60,6 +60,8 @@ if (supabase) {
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
+// --- API Routes (Registered immediately for Vercel) ---
+
 // Debug Route
 app.get("/api/debug", (req, res) => {
   res.json({
@@ -70,7 +72,6 @@ app.get("/api/debug", (req, res) => {
   });
 });
 
-// API Routes
 app.get("/api/portfolio", async (req, res) => {
   try {
     if (supabase) {
@@ -87,10 +88,9 @@ app.get("/api/portfolio", async (req, res) => {
   }
 
   if (process.env.NODE_ENV === "production") {
-    return res.json({ views: 0 }); // No fallback on production
+    return res.json({ views: 0 });
   }
 
-  // SQLite Fallback (Local only)
   const database = await getDb();
   if (database) {
     try {
@@ -116,9 +116,8 @@ app.post("/api/portfolio", async (req, res) => {
       if (error) throw new Error(`Supabase Error: ${error.message}`);
       return res.json({ success: true });
     } else if (process.env.NODE_ENV === "production") {
-      return res.status(500).json({ error: "Configuration Supabase manquante sur Vercel. Vérifiez vos variables d'environnement (SUPABASE_URL et SUPABASE_KEY)." });
+      return res.status(500).json({ error: "Configuration Supabase manquante sur Vercel." });
     } else {
-      // SQLite Fallback (Local only)
       const database = await getDb();
       if (database) {
         database.prepare("UPDATE portfolio SET data = ? WHERE id = 1").run(JSON.stringify(data));
@@ -141,7 +140,6 @@ app.post("/api/views", async (req, res) => {
     } else if (process.env.NODE_ENV === "production") {
       return res.json({ views: 0 });
     } else {
-      // SQLite Fallback
       const database = await getDb();
       if (database) {
         database.prepare("UPDATE views SET count = count + 1 WHERE id = 1").run();
@@ -156,7 +154,7 @@ app.post("/api/views", async (req, res) => {
   }
 });
 
-export default app; // Export for Vercel
+export default app;
 
 async function startServer() {
   const PORT = 3000;
