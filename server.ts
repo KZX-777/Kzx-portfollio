@@ -31,16 +31,34 @@ const supabase = isSupabaseValid(supabaseUrl, supabaseKey)
   : null;
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ limit: '200mb', extended: true }));
 
-app.get("/api/debug", (req, res) => {
+// Error handler for JSON parsing (e.g., body too large)
+app.use((err: any, req: any, res: any, next: any) => {
+  if (err && err.type === 'entity.too.large') {
+    console.error("Request body too large:", err);
+    return res.status(413).json({ error: "Les données sont trop lourdes pour être envoyées au serveur." });
+  }
+  next(err);
+});
+
+const apiRouter = express.Router();
+
+apiRouter.get("/health", (req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString() });
+});
+
+apiRouter.get("/debug", (req, res) => {
   res.json({
     supabaseConfigured: !!supabase,
     hasUrl: !!supabaseUrl,
     hasKey: !!supabaseKey,
     urlValid: supabaseUrl?.startsWith('http') || false,
     urlValue: supabaseUrl ? `${supabaseUrl.substring(0, 10)}...` : null,
-    env: process.env.NODE_ENV || "development"
+    env: process.env.NODE_ENV || "development",
+    isInitialLoadDone,
+    cachedPortfolioKeys: Object.keys(cachedPortfolio)
   });
 });
 
@@ -97,8 +115,8 @@ syncFromSupabase();
 // Periodically sync from Supabase every 5 minutes to ensure cache consistency
 setInterval(syncFromSupabase, 5 * 60 * 1000);
 
-// API Routes
-app.get("/api/portfolio", async (req, res) => {
+// API Router Routes
+apiRouter.get("/portfolio", async (req, res) => {
   // Prevent browser caching
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
@@ -113,9 +131,13 @@ app.get("/api/portfolio", async (req, res) => {
   }
 });
 
-app.post("/api/portfolio", async (req, res) => {
+apiRouter.post("/portfolio", async (req, res) => {
+  console.log(`[POST] /api/portfolio received`);
   const { password, data } = req.body;
   if (password !== "Ultraadmin275673@772") return res.status(401).json({ error: "Unauthorized" });
+
+  const dataSize = JSON.stringify(data).length;
+  console.log(`[SAVE] Data size: ${(dataSize / (1024 * 1024)).toFixed(2)} MB`);
 
   // Update cache INSTANTLY
   cachedPortfolio = { ...data, views: cachedPortfolio.views };
@@ -134,7 +156,7 @@ app.post("/api/portfolio", async (req, res) => {
   res.json({ success: true, message: "Sauvegarde en cours (instantané en cache)" });
 });
 
-app.post("/api/views", async (req, res) => {
+apiRouter.post("/views", async (req, res) => {
   // Increment cache instantly
   cachedPortfolio.views += 1;
   res.json({ views: cachedPortfolio.views });
@@ -151,6 +173,8 @@ app.post("/api/views", async (req, res) => {
   
   saveViewsToSupabase();
 });
+
+app.use("/api", apiRouter);
 
 export default app;
 

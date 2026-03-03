@@ -318,9 +318,30 @@ export default function App() {
 
   // Fetch data on mount and poll for updates
   useEffect(() => {
-    const fetchData = async (isInitial = false, shouldIncrementViews = false) => {
+    const fetchData = async (isInitial = false, shouldIncrementViews = false, retryCount = 0) => {
       try {
         const res = await fetch("/api/portfolio");
+        
+        // Handle non-JSON or error responses (like "Starting Server..." HTML)
+        const contentType = res.headers.get("content-type");
+        if (!res.ok || !contentType || !contentType.includes("application/json")) {
+          const text = await res.text();
+          
+          // If we get HTML, the server might be starting up or restarting
+          if (retryCount < 5) {
+            // Check if it's the specific "Starting Server" page
+            const isStarting = text.includes("Starting Server") || text.includes("<!doctype html>");
+            const delay = isStarting ? 3000 : 1000;
+            
+            console.log(`Server not ready (received ${isStarting ? 'HTML' : contentType}), retrying in ${delay}ms... (Attempt ${retryCount + 1}/5)`);
+            setTimeout(() => fetchData(isInitial, shouldIncrementViews, retryCount + 1), delay);
+            return;
+          }
+          
+          console.error("API Error Response:", text.substring(0, 200));
+          throw new Error(`Le serveur est en cours de démarrage ou indisponible (${res.status}).`);
+        }
+
         const json = await res.json();
         
         if (json && Object.keys(json).length > 1) {
@@ -335,21 +356,48 @@ export default function App() {
         }
         
         if (shouldIncrementViews) {
-          const viewRes = await fetch("/api/views", { method: "POST" });
-          const viewJson = await viewRes.json();
-          setData(prev => ({ ...prev, views: viewJson.views }));
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            const viewRes = await fetch("/api/views", { 
+              method: "POST",
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            const contentType = viewRes.headers.get("content-type");
+            if (!viewRes.ok || !contentType || !contentType.includes("application/json")) {
+              throw new Error(`View API error: ${viewRes.status}`);
+            }
+
+            const viewJson = await viewRes.json();
+            setData(prev => ({ ...prev, views: viewJson.views }));
+          } catch (err) {
+            console.error("View increment failed", err);
+          }
         }
       } catch (e) {
-        console.error("Failed to fetch data", e);
+        // Only log polling errors to console, don't show alert to avoid spamming
+        if (isInitial) {
+          console.error("Initial fetch failed", e);
+        } else {
+          console.warn("Polling fetch failed", e);
+        }
       }
     };
 
     // Initial load: fetch data and increment views only if not already admin
-    fetchData(true, !isAdmin);
+    // Add a small delay for initial load to ensure server is ready
+    const timer = setTimeout(() => {
+      fetchData(true, !isAdmin);
+    }, 1500);
     
     // Poll every 3 seconds for updates (don't increment views during polling)
     const interval = setInterval(() => fetchData(false, false), 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [isAdmin, isSaving]);
 
   // Handle Music Play/Pause
@@ -365,15 +413,28 @@ export default function App() {
   };
 
   // Save data to backend
-  const saveToBackend = async (newData: PortfolioData) => {
+  const saveToBackend = async (newData: PortfolioData, retryCount = 0) => {
     if (!isAdmin) return;
+    
+    // Check total size of data (approximate)
+    const dataSize = JSON.stringify(newData).length;
+    if (dataSize > 40 * 1024 * 1024) { // 40MB limit for safety
+      alert("Votre portfolio est trop lourd (trop d'images ou vidéos). Veuillez en supprimer quelques-unes avant d'en ajouter de nouvelles.");
+      return;
+    }
+
     setIsSaving(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
     try {
       const res = await fetch("/api/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword, data: newData })
+        body: JSON.stringify({ password: adminPassword, data: newData }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -385,11 +446,31 @@ export default function App() {
         }
         throw new Error(errorMessage);
       }
+      setIsSaving(false);
     } catch (e: any) {
       console.error("Save error:", e);
-      alert(e.message || "Erreur lors de la sauvegarde. Vérifiez votre connexion.");
-    } finally {
+      
+      if (e.name === 'AbortError') {
+        alert("La sauvegarde a pris trop de temps (timeout). Vos données sont peut-être trop lourdes.");
+        setIsSaving(false);
+        return;
+      }
+
+      // Retry once if it's a fetch error (might be server waking up)
+      if (e.message === "Failed to fetch" && retryCount < 1) {
+        console.log("Retrying save...");
+        setTimeout(() => saveToBackend(newData, retryCount + 1), 2000);
+        return; // Skip finally block for this attempt
+      }
+
+      if (e.message === "Failed to fetch") {
+        alert("Erreur de connexion : Vos données sont peut-être trop lourdes pour le serveur (images/vidéos trop grandes) ou votre connexion est instable. Essayez de mettre des fichiers plus légers.");
+      } else {
+        alert(e.message || "Erreur lors de la sauvegarde. Vérifiez votre connexion.");
+      }
       setIsSaving(false);
+    } finally {
+      // Only set to false if we didn't return early for a retry
     }
   };
 
@@ -399,9 +480,9 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size for videos (max 5MB to be safe with Base64 overhead)
-    if (type === 'video' && file.size > 5 * 1024 * 1024) {
-      alert("Cette vidéo est trop lourde (max 5Mo). Veuillez la compresser avant de l'ajouter.");
+    // Check size for videos (max 4MB to be safe with Base64 overhead)
+    if (type === 'video' && file.size > 4 * 1024 * 1024) {
+      alert("Cette vidéo est trop lourde (max 4Mo). Veuillez la compresser avant de l'ajouter.");
       return;
     }
 
@@ -446,8 +527,8 @@ export default function App() {
         let width = img.width;
         let height = img.height;
         
-        // Max dimension 1200px
-        const MAX_SIZE = 1200;
+        // Max dimension 1000px for better performance/size
+        const MAX_SIZE = 1000;
         if (width > height) {
           if (width > MAX_SIZE) {
             height *= MAX_SIZE / width;
@@ -464,7 +545,7 @@ export default function App() {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality
       };
     });
   };
